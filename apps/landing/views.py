@@ -5,7 +5,7 @@ Lives at the root of each gym's subdomain (e.g. ironhouse.gymforge.com/).
 All content is driven by GymProfile + tenant-schema data.
 GymForge branding must never appear on this page.
 """
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from django.http import HttpResponse, HttpResponseNotAllowed
 from django.views.decorators.http import require_POST
 
@@ -27,13 +27,13 @@ def landing_page(request):
     # touching the DB or rendering any template that triggers context processors.
     tenant = getattr(request, 'tenant', None)
     if tenant is None:
-        return HttpResponse(status=200)
+        return redirect('/setup/')
     try:
         from django_tenants.utils import get_public_schema_name
         if tenant.schema_name == get_public_schema_name():
-            return HttpResponse(status=200)
+            return redirect('/setup/')
     except Exception:
-        return HttpResponse(status=200)
+        return redirect('/setup/')
 
     try:
         profile = GymProfile.objects.get()
