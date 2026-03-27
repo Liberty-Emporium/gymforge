@@ -4,7 +4,7 @@
     "builder": "RAILPACK"
   },
   "deploy": {
-    "startCommand": "python -c \"import os; url=os.environ.get('DATABASE_URL','NOT_SET'); print('DATABASE_URL host:', url.split('@')[-1].split('/')[0] if '@' in url else url)\" && python manage.py collectstatic --noinput && python manage.py migrate_schemas --shared && gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 120",
+    "startCommand": "python -c \"import os; keys=[k for k in os.environ if any(x in k.upper() for x in ['DATABASE','POSTGRES','PGHOST','PGPORT','PGUSER','PGPASS','PGDATA','PGDB'])]; print('DB env vars found:', keys or 'NONE')\" && python manage.py collectstatic --noinput && python manage.py migrate_schemas --shared && gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 120",
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 3
   }
