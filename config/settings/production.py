@@ -2,6 +2,7 @@
 GymForge — Production Settings (Railway)
 """
 from .base import *
+import os
 import dj_database_url
 from decouple import config
 
@@ -21,19 +22,16 @@ SHOW_PUBLIC_IF_NO_TENANT_FOUND = True
 # ---------------------------------------------------------------------------
 # Database — Railway provides DATABASE_URL automatically
 # ---------------------------------------------------------------------------
-_db_from_env = dj_database_url.config(
-    default=config('DATABASE_URL', default=''),
-    conn_max_age=600,
-    conn_health_checks=True,
-)
-if _db_from_env:
-    # Keep the django-tenants engine, merge the rest of the URL settings
+_raw_db_url = os.environ.get('DATABASE_URL', '')
+if _raw_db_url:
+    # Parse the URL directly; keep the django-tenants engine
+    _db_from_env = dj_database_url.parse(_raw_db_url, conn_max_age=600, conn_health_checks=True)
     DATABASES['default'].update({
-        'NAME': _db_from_env.get('NAME', DATABASES['default']['NAME']),
-        'USER': _db_from_env.get('USER', DATABASES['default']['USER']),
-        'PASSWORD': _db_from_env.get('PASSWORD', DATABASES['default']['PASSWORD']),
-        'HOST': _db_from_env.get('HOST', DATABASES['default']['HOST']),
-        'PORT': _db_from_env.get('PORT', DATABASES['default']['PORT']),
+        'NAME': _db_from_env['NAME'],
+        'USER': _db_from_env['USER'],
+        'PASSWORD': _db_from_env['PASSWORD'],
+        'HOST': _db_from_env['HOST'],
+        'PORT': _db_from_env['PORT'],
         'CONN_MAX_AGE': 600,
         'CONN_HEALTH_CHECKS': True,
     })
