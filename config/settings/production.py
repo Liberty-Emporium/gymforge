@@ -7,7 +7,16 @@ from decouple import config
 
 DEBUG = False
 
-ALLOWED_HOSTS = ['.gymforge.com', 'gymforge.com']
+ALLOWED_HOSTS = [
+    '.gymforge.com',
+    'gymforge.com',
+    '.railway.app',
+    config('RAILWAY_PUBLIC_DOMAIN', default=''),
+]
+
+# Fall back to public schema when the request domain isn't in GymDomain
+# (covers the Railway preview URL and any unregistered domains)
+SHOW_PUBLIC_IF_NO_TENANT_FOUND = True
 
 # ---------------------------------------------------------------------------
 # Database — Railway provides DATABASE_URL automatically
