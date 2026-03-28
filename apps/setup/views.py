@@ -611,3 +611,31 @@ def partial_plan_row(request):
         'plan': {'name': '', 'price': '', 'billing_cycle': 'monthly', 'description': ''},
         'idx': idx, 'billing_cycles': BILLING_CYCLES,
     })
+
+
+# ---------------------------------------------------------------------------
+# Domain Repair — one-time utility to map the current HOST to all tenants
+# ---------------------------------------------------------------------------
+
+def repair_domains(request):
+    """
+    Adds the current request host as a secondary GymDomain for every tenant
+    that doesn't already have it.  Hit this once after deploying to a new
+    Railway URL so the gym portals are reachable without a custom domain.
+
+    Safe to call multiple times (uses get_or_create).
+    """
+    from apps.tenants.models import GymTenant, GymDomain
+    host = request.get_host().split(':')[0]  # strip port if any
+    tenants = GymTenant.objects.exclude(schema_name='public')
+    results = []
+    for tenant in tenants:
+        obj, created = GymDomain.objects.get_or_create(
+            domain=host,
+            tenant=tenant,
+            defaults={'is_primary': False},
+        )
+        results.append(f'{"ADDED" if created else "EXISTS"}: {host} → {tenant.gym_name}')
+
+    body = '\n'.join(results) or 'No tenants found.'
+    return HttpResponse(body, content_type='text/plain')

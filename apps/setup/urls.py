@@ -28,4 +28,7 @@ urlpatterns = [
     # HTMX partials for dynamic form rows
     path('partials/location-form/', views.partial_location_form, name='partial_location_form'),
     path('partials/plan-row/', views.partial_plan_row, name='partial_plan_row'),
+
+    # One-time domain repair — adds the current HOST to every tenant's GymDomain
+    path('repair-domains/', views.repair_domains, name='repair_domains'),
 ]

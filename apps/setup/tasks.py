@@ -111,7 +111,7 @@ def provision_gym(self, wizard_data: dict) -> dict:
     tenant.save()  # triggers create_schema() + migrate_schemas for this tenant
 
     # ------------------------------------------------------------------
-    # Step 3 — Create GymDomain (subdomain)
+    # Step 3 — Create GymDomain (subdomain + Railway preview URL)
     # ------------------------------------------------------------------
     _progress(3, 'Configuring subdomain…')
     GymDomain.objects.create(
@@ -119,6 +119,15 @@ def provision_gym(self, wizard_data: dict) -> dict:
         tenant=tenant,
         is_primary=True,
     )
+    # Also map the Railway deployment URL so the demo works without DNS
+    import os
+    railway_domain = os.environ.get('RAILWAY_PUBLIC_DOMAIN', '')
+    if railway_domain:
+        GymDomain.objects.get_or_create(
+            domain=railway_domain,
+            tenant=tenant,
+            defaults={'is_primary': False},
+        )
 
     # ------------------------------------------------------------------
     # Step 4 — Create gym owner User (public schema — accounts is SHARED_APPS)
