@@ -22,11 +22,11 @@ DEFAULT_CLASS_TYPES = [
 ]
 
 DEFAULT_LOYALTY_RULES = [
-    # (action, points, daily_cap, description)
-    ('check_in',         10, 1, 'Points awarded on each gym check-in'),
-    ('class_attend',     20, 1, 'Points awarded for attending a class'),
-    ('referral',        100, 0, 'Points awarded for referring a new member'),
-    ('birthday',         50, 0, 'Birthday bonus points'),
+    # (action, points, max_per_day, description)
+    ('checkin',          10, 1,    'Points awarded on each gym check-in'),
+    ('class_attended',   20, 1,    'Points awarded for attending a class'),
+    ('referral',        100, None, 'Points awarded for referring a new member'),
+    ('birthday',         50, None, 'Birthday bonus points'),
 ]
 
 # Predefined services that are always seeded (is_custom=False)
@@ -231,11 +231,11 @@ def provision_gym(self, wizard_data: dict) -> dict:
         # Step 13 — Seed default LoyaltyRules
         _progress(13, 'Setting up loyalty programme…')
         from apps.loyalty.models import LoyaltyRule
-        for action, points, daily_cap, description in DEFAULT_LOYALTY_RULES:
+        for action, points, max_per_day, description in DEFAULT_LOYALTY_RULES:
             LoyaltyRule.objects.create(
                 action=action,
                 points=points,
-                daily_cap=daily_cap,
+                max_per_day=max_per_day,
                 is_active=True,
             )
 
