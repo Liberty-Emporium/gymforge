@@ -111,6 +111,16 @@ def _identity_ctx(wizard):
     }
 
 
+def _account_ctx(wizard):
+    """Return owner account dict with all keys guaranteed present (avoids VariableDoesNotExist in templates)."""
+    raw = wizard.get('owner') or {}
+    return {
+        'first_name': raw.get('first_name', ''),
+        'last_name':  raw.get('last_name', ''),
+        'email':      raw.get('email', ''),
+    }
+
+
 def _generate_schema_name(gym_name):
     """
     Derive a unique PostgreSQL schema name from the gym name.
@@ -349,14 +359,20 @@ def step3(request):
             })
             return redirect('setup:step4')
 
+        vals = {
+            'first_name': first_name,
+            'last_name':  last_name,
+            'email':      email,
+        }
         return render(request, 'owner/step3_account.html', {
             'step': 3, 'wizard': wizard, 'errors': errors,
-            'post': request.POST,
+            'vals': vals,
         })
 
     return render(request, 'owner/step3_account.html', {
         'step': 3, 'wizard': wizard,
-        'owner': wizard.get('owner', {}),
+        'vals': _account_ctx(wizard),
+        'errors': {},
     })
 
 

@@ -14,7 +14,7 @@
     <div>
       <label class="block text-sm font-medium text-gray-300 mb-1">First Name <span class="text-red-400">*</span></label>
       <input type="text" name="first_name"
-             value="{{ post.first_name|default:owner.first_name|default:'' }}"
+             value="{{ vals.first_name }}"
              required autofocus
              class="w-full bg-gray-800 border {% if errors.first_name %}border-red-500{% else %}border-gray-700{% endif %} rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-brand">
       {% if errors.first_name %}<p class="mt-1 text-xs text-red-400">{{ errors.first_name }}</p>{% endif %}
@@ -22,7 +22,7 @@
     <div>
       <label class="block text-sm font-medium text-gray-300 mb-1">Last Name <span class="text-red-400">*</span></label>
       <input type="text" name="last_name"
-             value="{{ post.last_name|default:owner.last_name|default:'' }}"
+             value="{{ vals.last_name }}"
              required
              class="w-full bg-gray-800 border {% if errors.last_name %}border-red-500{% else %}border-gray-700{% endif %} rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-brand">
       {% if errors.last_name %}<p class="mt-1 text-xs text-red-400">{{ errors.last_name }}</p>{% endif %}
@@ -32,7 +32,7 @@
   <div>
     <label class="block text-sm font-medium text-gray-300 mb-1">Email Address <span class="text-red-400">*</span></label>
     <input type="email" name="email"
-           value="{{ post.email|default:owner.email|default:'' }}"
+           value="{{ vals.email }}"
            required
            class="w-full bg-gray-800 border {% if errors.email %}border-red-500{% else %}border-gray-700{% endif %} rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-brand">
     {% if errors.email %}<p class="mt-1 text-xs text-red-400">{{ errors.email }}</p>{% endif %}
