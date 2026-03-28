@@ -28,18 +28,14 @@
       <h2 class="text-sm font-semibold text-white">Feature Toggles</h2>
       <p class="text-xs text-gray-500 mt-0.5">Enable or disable features for your members.</p>
     </div>
-    {% for key, label in feature_keys %}
+    {% for key, label, is_enabled in feature_states %}
     <label class="flex items-center justify-between cursor-pointer group">
       <span class="text-sm text-gray-300 group-hover:text-white transition-colors">{{ label }}</span>
       <div class="relative">
         <input type="checkbox" name="feature_{{ key }}" value="on"
                class="sr-only peer"
                id="feature_{{ key }}"
-               {% if profile.features_enabled|default:{} %}
-                 {% for fkey, fval in profile.features_enabled.items %}
-                   {% if fkey == key and fval %}checked{% endif %}
-                 {% endfor %}
-               {% endif %}>
+               {% if is_enabled %}checked{% endif %}>
         <div class="w-10 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:bg-[var(--accent)] transition-colors"></div>
         <div class="absolute top-0.5 left-0.5 bg-white w-5 h-5 rounded-full transition-transform peer-checked:translate-x-4 pointer-events-none"></div>
       </div>

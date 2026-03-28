@@ -21,6 +21,10 @@ urlpatterns = [
     path('ai/',                             views.ai_chat,          name='ai_chat'),
     path('ai/send/',                        views.ai_chat_send,     name='ai_chat_send'),
     path('ai/new/',                         views.ai_chat_new,      name='ai_chat_new'),
+    path('members/',                        views.member_list,            name='member_list'),
+    path('schedule/',                       views.schedule_view,          name='schedule'),
+    path('analytics/',                      views.analytics_view,         name='analytics'),
+    path('inventory/',                      views.inventory_view,         name='inventory'),
     path('settings/',                       views.gym_settings,           name='gym_settings'),
     path('leads/',                          include('apps.leads.urls')),
     # Shop management

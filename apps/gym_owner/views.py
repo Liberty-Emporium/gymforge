@@ -581,6 +581,81 @@ def ai_chat_new(request):
 # GymProfile Settings
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Member Management (owner view)
+# ---------------------------------------------------------------------------
+
+@gym_owner_required
+def member_list(request):
+    from apps.members.models import MemberProfile
+    from apps.billing.models import MemberMembership
+
+    status_filter = request.GET.get('filter', '')
+
+    members_qs = (
+        MemberProfile.objects
+        .select_related('user')
+        .order_by('-join_date')
+    )
+
+    # Attach active membership status via subquery-friendly approach
+    active_memberships = {
+        m.member_id: m
+        for m in MemberMembership.objects.filter(
+            status__in=['active', 'overdue', 'expiring', 'frozen', 'suspended']
+        ).select_related('tier')
+    }
+
+    members = []
+    for mp in members_qs:
+        membership = active_memberships.get(mp.pk)
+        status = membership.status if membership else 'none'
+        if status_filter == 'churn' and status not in ['active', 'expiring']:
+            continue
+        members.append({
+            'profile':    mp,
+            'membership': membership,
+            'status':     status,
+        })
+
+    return render(request, 'owner/members.html', {
+        'members':       members,
+        'status_filter': status_filter,
+        'total':         len(members),
+    })
+
+
+# ---------------------------------------------------------------------------
+# Stub views — sections not yet fully implemented
+# ---------------------------------------------------------------------------
+
+@gym_owner_required
+def schedule_view(request):
+    return render(request, 'owner/stub.html', {
+        'section_title': 'Schedule',
+        'section_icon':  'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',
+        'description':   'Class scheduling and session management is coming soon.',
+    })
+
+
+@gym_owner_required
+def analytics_view(request):
+    return render(request, 'owner/stub.html', {
+        'section_title': 'Analytics',
+        'section_icon':  'M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z',
+        'description':   'Advanced analytics and revenue reporting is coming soon.',
+    })
+
+
+@gym_owner_required
+def inventory_view(request):
+    return render(request, 'owner/stub.html', {
+        'section_title': 'Inventory',
+        'section_icon':  'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4',
+        'description':   'Equipment and inventory tracking is coming soon.',
+    })
+
+
 FEATURE_KEYS = [
     ('community_feed',  'Community Feed'),
     ('shop',            'Shop / POS'),
@@ -616,8 +691,14 @@ def gym_settings(request):
         ])
         saved = True
 
+    # Pre-compute enabled state for each feature (default True if key not in dict)
+    feature_states = [
+        (key, label, bool(profile.features_enabled.get(key, True)))
+        for key, label in FEATURE_KEYS
+    ]
+
     return render(request, 'owner/gym_settings.html', {
-        'profile':      profile,
-        'feature_keys': FEATURE_KEYS,
-        'saved':        saved,
+        'profile':        profile,
+        'feature_states': feature_states,
+        'saved':          saved,
     })
