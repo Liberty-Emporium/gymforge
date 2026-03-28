@@ -672,3 +672,71 @@ def create_platform_admin(request):
         f'CREATED: {email} / GymForge2026! — log in at /auth/login/',
         content_type='text/plain',
     )
+
+
+# ---------------------------------------------------------------------------
+# Create demo users — one account per staff/member role for the demo gym
+# ---------------------------------------------------------------------------
+
+def create_demo_users(request):
+    """
+    Creates one demo user per role for the most recently provisioned tenant.
+    Also creates a MemberProfile in that tenant's schema and enables member_app_active.
+    Safe to call multiple times — skips users that already exist.
+
+    Credentials: <role>@demo.gymforge.com / Demo2026!
+    """
+    from apps.accounts.models import User
+    from apps.tenants.models import GymTenant
+    from django_tenants.utils import schema_context
+
+    tenant = GymTenant.objects.exclude(schema_name='public').order_by('-created_at').first()
+    if not tenant:
+        return HttpResponse('No tenant found.', content_type='text/plain', status=404)
+
+    demo_roles = [
+        ('manager',      'Manager',      'Demo'),
+        ('trainer',      'Trainer',      'Demo'),
+        ('front_desk',   'Front Desk',   'Demo'),
+        ('cleaner',      'Cleaner',      'Demo'),
+        ('nutritionist', 'Nutritionist', 'Demo'),
+        ('member',       'Member',       'Demo'),
+    ]
+
+    lines = [f'Tenant: {tenant.gym_name} ({tenant.schema_name})', '']
+    password = 'Demo2026!'
+
+    for role, first, last in demo_roles:
+        email = f'{role}@demo.gymforge.com'
+        username = email
+        if User.objects.filter(email__iexact=email).exists():
+            lines.append(f'EXISTS : {email}')
+            user = User.objects.get(email__iexact=email)
+        else:
+            user = User.objects.create_user(
+                username=username,
+                email=email,
+                password=password,
+                first_name=first,
+                last_name=last,
+                role=role,
+                is_active=True,
+            )
+            lines.append(f'CREATED: {email} / {password}')
+
+        # Create MemberProfile inside tenant schema for the member role
+        if role == 'member':
+            with schema_context(tenant.schema_name):
+                from apps.members.models import MemberProfile
+                if not MemberProfile.objects.filter(user=user).exists():
+                    MemberProfile.objects.create(user=user)
+                    lines.append('         → MemberProfile created in tenant schema')
+
+    # Enable member app for the demo
+    if not tenant.member_app_active:
+        tenant.member_app_active = True
+        tenant.save(update_fields=['member_app_active'])
+        lines.append('\nmember_app_active set to True')
+
+    lines.append('\nAll done — log in at /auth/login/')
+    return HttpResponse('\n'.join(lines), content_type='text/plain')

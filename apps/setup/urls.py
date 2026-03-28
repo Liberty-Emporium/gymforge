@@ -34,4 +34,7 @@ urlpatterns = [
 
     # One-time platform admin bootstrap
     path('create-admin/', views.create_platform_admin, name='create_platform_admin'),
+
+    # Demo: create one user per role + enable member app
+    path('create-demo-users/', views.create_demo_users, name='create_demo_users'),
 ]
