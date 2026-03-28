@@ -31,4 +31,7 @@ urlpatterns = [
 
     # One-time domain repair — adds the current HOST to every tenant's GymDomain
     path('repair-domains/', views.repair_domains, name='repair_domains'),
+
+    # One-time platform admin bootstrap — POST only, safe to leave deployed
+    path('create-admin/', views.create_admin, name='create_admin'),
 ]

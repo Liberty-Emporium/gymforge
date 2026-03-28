@@ -10,7 +10,8 @@ import uuid
 
 from django.conf import settings
 from django.shortcuts import render, redirect
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
+from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
 from apps.tenants.models import GymTenant
@@ -639,3 +640,53 @@ def repair_domains(request):
 
     body = '\n'.join(results) or 'No tenants found.'
     return HttpResponse(body, content_type='text/plain')
+
+
+
+# ---------------------------------------------------------------------------
+# One-time platform admin bootstrap
+# ---------------------------------------------------------------------------
+
+@csrf_exempt
+@require_POST
+def create_admin(request):
+    """
+    One-time endpoint to bootstrap the platform admin user.
+
+    POST /setup/create-admin/
+
+    Creates the GymForge platform admin account if one does not already exist.
+    Returns JSON so it can be called with a plain HTTP client (curl, Postman, etc.)
+    without needing a CSRF token.
+
+    Safe to leave deployed — subsequent calls return 409 once the admin exists.
+    """
+    from apps.accounts.models import User
+
+    if User.objects.filter(role='platform_admin').exists():
+        return JsonResponse(
+            {'success': False, 'message': 'Platform admin already exists.'},
+            status=409,
+        )
+
+    try:
+        User.objects.create_user(
+            username='admin@gymforge.com',
+            email='admin@gymforge.com',
+            password='GymForge2026!',
+            first_name='Platform',
+            last_name='Admin',
+            role='platform_admin',
+            is_active=True,
+            is_staff=True,
+        )
+    except Exception as exc:
+        return JsonResponse(
+            {'success': False, 'message': f'Failed to create admin: {exc}'},
+            status=500,
+        )
+
+    return JsonResponse(
+        {'success': True, 'message': 'Platform admin created successfully.'},
+        status=201,
+    )
