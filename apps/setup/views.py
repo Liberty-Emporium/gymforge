@@ -235,16 +235,22 @@ def step1(request):
             })
             return redirect('setup:step2')
 
+        vals = {
+            'gym_name':      gym_name,
+            'tagline':       tagline,
+            'primary_color': primary_color,
+            'accent_color':  accent_color,
+            'logo_path':     wizard.get('identity', {}).get('logo_path', ''),
+        }
         return render(request, 'owner/step1_identity.html', {
             'step': 1, 'wizard': wizard, 'errors': errors,
-            'post': request.POST,
-            'identity': _identity_ctx(wizard),
+            'vals': vals,
         })
 
+    identity = _identity_ctx(wizard)
     return render(request, 'owner/step1_identity.html', {
         'step': 1, 'wizard': wizard,
-        'identity': _identity_ctx(wizard),
-        'post': {},
+        'vals': identity,
         'errors': {},
     })
 

@@ -13,7 +13,7 @@
   <div>
     <label class="block text-sm font-medium text-gray-300 mb-1">Gym Name <span class="text-red-400">*</span></label>
     <input type="text" name="gym_name"
-           value="{{ post.gym_name|default:identity.gym_name|default:'' }}"
+           value="{{ vals.gym_name }}"
            required autofocus placeholder="e.g. Iron House Gym"
            class="w-full bg-gray-800 border {% if errors.gym_name %}border-red-500{% else %}border-gray-700{% endif %} rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-brand">
     {% if errors.gym_name %}<p class="mt-1 text-xs text-red-400">{{ errors.gym_name }}</p>{% endif %}
@@ -22,7 +22,7 @@
   <div>
     <label class="block text-sm font-medium text-gray-300 mb-1">Tagline <span class="text-gray-500 font-normal">(optional)</span></label>
     <input type="text" name="tagline"
-           value="{{ post.tagline|default:identity.tagline|default:'' }}"
+           value="{{ vals.tagline }}"
            placeholder="e.g. Forge Your Body, Build Your Future"
            class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-brand">
   </div>
@@ -33,10 +33,10 @@
       <div class="flex items-center gap-3">
         <input type="color" name="primary_color"
                id="primary-picker"
-               value="{{ post.primary_color|default:identity.primary_color|default:'#1a1a2e' }}"
+               value="{{ vals.primary_color }}"
                class="w-12 h-10 rounded cursor-pointer border-0 bg-transparent">
         <input type="text" id="primary-hex"
-               value="{{ post.primary_color|default:identity.primary_color|default:'#1a1a2e' }}"
+               value="{{ vals.primary_color }}"
                class="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white font-mono focus:outline-none focus:border-brand">
       </div>
     </div>
@@ -45,10 +45,10 @@
       <div class="flex items-center gap-3">
         <input type="color" name="accent_color"
                id="accent-picker"
-               value="{{ post.accent_color|default:identity.accent_color|default:'#e94560' }}"
+               value="{{ vals.accent_color }}"
                class="w-12 h-10 rounded cursor-pointer border-0 bg-transparent">
         <input type="text" id="accent-hex"
-               value="{{ post.accent_color|default:identity.accent_color|default:'#e94560' }}"
+               value="{{ vals.accent_color }}"
                class="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white font-mono focus:outline-none focus:border-brand">
       </div>
     </div>
@@ -56,7 +56,7 @@
 
   <div>
     <label class="block text-sm font-medium text-gray-300 mb-1">Logo <span class="text-gray-500 font-normal">(optional — PNG or JPG)</span></label>
-    {% if identity.logo_path %}<p class="text-xs text-green-400 mb-2">✓ Logo already uploaded — upload again to replace</p>{% endif %}
+    {% if vals.logo_path %}<p class="text-xs text-green-400 mb-2">✓ Logo already uploaded — upload again to replace</p>{% endif %}
     <input type="file" name="logo" accept="image/png,image/jpeg,image/webp"
            class="w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-brand/20 file:text-brand hover:file:bg-brand/30 cursor-pointer">
   </div>
@@ -65,15 +65,15 @@
   <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
     <p class="text-xs text-gray-500 uppercase tracking-wide font-medium mb-3">Live Preview</p>
     <div id="preview-card" class="rounded-xl p-6 transition-all duration-300"
-         style="background: {{ post.primary_color|default:identity.primary_color|default:'#1a1a2e' }}">
+         style="background: {{ vals.primary_color|default:'#1a1a2e' }}">
       <h2 id="preview-name" class="text-xl font-bold text-white">
-        {{ post.gym_name|default:identity.gym_name|default:'Your Gym Name' }}
+        {{ vals.gym_name|default:'Your Gym Name' }}
       </h2>
       <p id="preview-tagline" class="text-sm mt-1 text-white/70">
-        {{ post.tagline|default:identity.tagline|default:'Your tagline here' }}
+        {{ vals.tagline|default:'Your tagline here' }}
       </p>
       <div id="preview-accent" class="mt-3 w-20 h-1 rounded-full"
-           style="background: {{ post.accent_color|default:identity.accent_color|default:'#e94560' }}"></div>
+           style="background: {{ vals.accent_color|default:'#e94560' }}"></div>
     </div>
   </div>
 
