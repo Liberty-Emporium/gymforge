@@ -514,11 +514,23 @@ def confirm(request):
     # Pass a plain dict — no Django objects, fully JSON-serializable
     wizard_data = dict(wizard)
 
-    result = provision_gym.delay(wizard_data)
+    try:
+        result = provision_gym.delay(wizard_data)
+    except Exception as exc:
+        return render(request, 'owner/setup_error.html', {
+            'error': str(exc),
+            'wizard': wizard,
+        })
 
     # In dev (CELERY_TASK_ALWAYS_EAGER=True) result is already ready
     if result.ready():
-        info = result.get()
+        try:
+            info = result.get()
+        except Exception as exc:
+            return render(request, 'owner/setup_error.html', {
+                'error': str(exc),
+                'wizard': wizard,
+            })
         # Clear wizard session
         request.session.pop('wizard', None)
         request.session.modified = True

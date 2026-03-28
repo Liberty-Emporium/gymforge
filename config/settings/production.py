@@ -48,6 +48,12 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
 
 # ---------------------------------------------------------------------------
+# Celery — run tasks synchronously (no worker/Redis needed for demo)
+# ---------------------------------------------------------------------------
+CELERY_TASK_ALWAYS_EAGER = True
+CELERY_TASK_EAGER_PROPAGATES = True
+
+# ---------------------------------------------------------------------------
 # Security
 # ---------------------------------------------------------------------------
 SECURE_SSL_REDIRECT = True
