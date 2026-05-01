@@ -12,7 +12,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/htmx.org@1.9.12"></script>
 
-  {# ── CSS variable injection from branding system (Step 20) ── #}
+  <!-- ── CSS variable injection from branding system (Step 20) ── -->
   <style>
     :root {
       --primary: {{ primary_color|default:"#1a1a2e" }};
@@ -67,7 +67,7 @@
     .tier-featured { outline: 2px solid var(--accent); outline-offset: 2px; }
   </style>
 
-  {# Pass CSRF for HTMX POST requests #}
+  <!-- Pass CSRF for HTMX POST requests -->
   <meta name="csrf-token" content="{{ csrf_token }}">
   <script>
     document.addEventListener('htmx:configRequest', function(e) {
@@ -79,13 +79,13 @@
 
 <body class="bg-gray-950 text-gray-100 font-sans antialiased">
 
-{# ════════════════════════════════════════════════════════════
+<!-- ════════════════════════════════════════════════════════════
    STICKY NAVIGATION
-════════════════════════════════════════════════════════════ #}
+════════════════════════════════════════════════════════════ -->
 <nav id="main-nav" class="fixed top-0 left-0 right-0 z-50 bg-transparent">
   <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
 
-    {# Gym identity #}
+    <!-- Gym identity -->
     <a href="/" class="flex items-center gap-3">
       {% if gym_logo_url %}
       <img src="{{ gym_logo_url }}" alt="{{ gym_name }}"
@@ -98,7 +98,7 @@
       <span class="font-bold text-white text-lg">{{ gym_name }}</span>
     </a>
 
-    {# Section nav links (desktop) #}
+    <!-- Section nav links (desktop) -->
     <div class="hidden md:flex items-center gap-6 text-sm text-white/70">
       {% if 'about' in active_sections %}
       <a href="#about" class="hover:text-white transition-colors">About</a>
@@ -117,7 +117,7 @@
       {% endif %}
     </div>
 
-    {# CTA #}
+    <!-- CTA -->
     {% if 'contact' in active_sections %}
     <a href="#contact"
        class="btn-accent px-5 py-2 rounded-xl text-sm font-semibold hidden sm:block">
@@ -135,14 +135,14 @@
 </script>
 
 
-{# ════════════════════════════════════════════════════════════
+<!-- ════════════════════════════════════════════════════════════
    SECTION 1 — HERO
-════════════════════════════════════════════════════════════ #}
+════════════════════════════════════════════════════════════ -->
 {% if 'hero' in active_sections or not active_sections %}
 <section id="hero"
          class="hero-bg min-h-screen flex flex-col items-center justify-center text-center px-6 pt-20 relative overflow-hidden">
 
-  {# Background banner image overlay #}
+  <!-- Background banner image overlay -->
   {% if profile.banner_image %}
   <div class="absolute inset-0 z-0">
     <img src="{{ profile.banner_image.url }}" alt="" class="w-full h-full object-cover opacity-20">
@@ -181,7 +181,7 @@
     </div>
   </div>
 
-  {# Scroll cue #}
+  <!-- Scroll cue -->
   <div class="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce text-white/40">
     <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
@@ -191,9 +191,9 @@
 {% endif %}
 
 
-{# ════════════════════════════════════════════════════════════
+<!-- ════════════════════════════════════════════════════════════
    SECTION 2 — ABOUT
-════════════════════════════════════════════════════════════ #}
+════════════════════════════════════════════════════════════ -->
 {% if 'about' in active_sections %}
 <section id="about" class="section-mid py-20 px-6">
   <div class="max-w-6xl mx-auto">
@@ -229,9 +229,9 @@
 {% endif %}
 
 
-{# ════════════════════════════════════════════════════════════
+<!-- ════════════════════════════════════════════════════════════
    SECTION 3 — CLASSES
-════════════════════════════════════════════════════════════ #}
+════════════════════════════════════════════════════════════ -->
 {% if 'classes' in active_sections and class_types %}
 <section id="classes" class="section-dark py-20 px-6">
   <div class="max-w-6xl mx-auto">
@@ -244,7 +244,7 @@
       {% for ct in class_types %}
       <div class="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden card-lift">
 
-        {# Cover image or branded gradient placeholder #}
+        <!-- Cover image or branded gradient placeholder -->
         {% if ct.cover_image %}
         <img src="{{ ct.cover_image.url }}" alt="{{ ct.name }}"
              class="w-full h-36 object-cover">
@@ -283,9 +283,9 @@
 {% endif %}
 
 
-{# ════════════════════════════════════════════════════════════
+<!-- ════════════════════════════════════════════════════════════
    SECTION 4 — TRAINERS
-════════════════════════════════════════════════════════════ #}
+════════════════════════════════════════════════════════════ -->
 {% if 'trainers' in active_sections and trainers %}
 <section id="trainers" class="section-mid py-20 px-6">
   <div class="max-w-6xl mx-auto">
@@ -298,7 +298,7 @@
       {% for trainer in trainers %}
       <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6 card-lift">
 
-        {# Photo or initials avatar #}
+        <!-- Photo or initials avatar -->
         {% if trainer.user.profile_photo %}
         <img src="{{ trainer.user.profile_photo.url }}"
              alt="{{ trainer.user.get_full_name }}"
@@ -330,9 +330,9 @@
 {% endif %}
 
 
-{# ════════════════════════════════════════════════════════════
+<!-- ════════════════════════════════════════════════════════════
    SECTION 5 — PRICING
-════════════════════════════════════════════════════════════ #}
+════════════════════════════════════════════════════════════ -->
 {% if 'pricing' in active_sections and tiers %}
 <section id="pricing" class="section-dark py-20 px-6">
   <div class="max-w-5xl mx-auto">
@@ -344,7 +344,7 @@
 
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 items-stretch">
       {% for tier in tiers %}
-      {# Feature the middle tier on 3-column layouts #}
+      <!-- Feature the middle tier on 3-column layouts -->
       <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6 flex flex-col card-lift
                   {% if forloop.counter == 2 and tiers|length == 3 %}tier-featured{% endif %}">
 
@@ -407,14 +407,14 @@
 {% endif %}
 
 
-{# ════════════════════════════════════════════════════════════
+<!-- ════════════════════════════════════════════════════════════
    SECTION 6 — CONTACT / LEAD CAPTURE
-════════════════════════════════════════════════════════════ #}
+════════════════════════════════════════════════════════════ -->
 {% if 'contact' in active_sections %}
 <section id="contact" class="section-mid py-20 px-6">
   <div class="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-12">
 
-    {# Lead capture form — HTMX powered #}
+    <!-- Lead capture form — HTMX powered -->
     <div>
       <p class="text-accent text-sm font-semibold uppercase tracking-widest mb-3">Get In Touch</p>
       <h2 class="text-3xl font-bold text-white mb-2">Start Your Journey</h2>
@@ -425,7 +425,7 @@
       </div>
     </div>
 
-    {# Location & hours info #}
+    <!-- Location & hours info -->
     <div class="space-y-6">
       <div>
         <p class="text-accent text-sm font-semibold uppercase tracking-widest mb-3">Find Us</p>
@@ -441,7 +441,7 @@
           <p class="text-sm text-gray-400">✉ {{ location.email }}</p>
           {% endif %}
 
-          {# Opening hours #}
+          <!-- Opening hours -->
           {% if location.hours.exists %}
           <div class="mt-4 border-t border-gray-800 pt-4">
             <p class="text-xs text-gray-500 uppercase tracking-wide font-medium mb-2">Hours</p>
@@ -466,7 +466,7 @@
         {% endif %}
       </div>
 
-      {# Social links #}
+      <!-- Social links -->
       {% if profile %}
       {% with links=profile.get_active_social_links %}
       {% if links %}
@@ -508,9 +508,9 @@
 {% endif %}
 
 
-{# ════════════════════════════════════════════════════════════
+<!-- ════════════════════════════════════════════════════════════
    FOOTER — gym identity only, no GymForge branding
-════════════════════════════════════════════════════════════ #}
+════════════════════════════════════════════════════════════ -->
 <footer class="section-dark border-t border-gray-800 py-8 px-6">
   <div class="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-gray-600">
     <div class="flex items-center gap-3">
