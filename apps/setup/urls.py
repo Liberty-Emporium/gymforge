@@ -37,4 +37,5 @@ urlpatterns = [
 
     # Demo: create one user per role + enable member app
     path('create-demo-users/', views.create_demo_users, name='create_demo_users'),
+    path('db-status/', views.db_status, name='db_status'),
 ]

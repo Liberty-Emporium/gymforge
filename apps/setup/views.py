@@ -654,6 +654,26 @@ def create_platform_admin(request):
 # Create demo users — one account per staff/member role for the demo gym
 # ---------------------------------------------------------------------------
 
+def db_status(request):
+    """
+    Shows which tables are missing from the DB vs what Django expects.
+    Temporary diagnostic endpoint — safe, read-only.
+    """
+    from django.db import connection
+    from django.apps import apps as django_apps
+    existing = set(connection.introspection.table_names())
+    expected = {m._meta.db_table for m in django_apps.get_models()}
+    missing = sorted(expected - existing)
+    lines = [f'DB tables: {len(existing)} present, {len(missing)} missing', '']
+    if missing:
+        lines.append('MISSING TABLES:')
+        for t in missing:
+            lines.append(f'  - {t}')
+    else:
+        lines.append('All expected tables exist!')
+    return HttpResponse('\n'.join(lines), content_type='text/plain')
+
+
 def create_demo_users(request):
     """
     Creates one demo user per role. Single-tenant: no schema_context needed.
