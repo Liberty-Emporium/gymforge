@@ -1,99 +1,25 @@
 #!/usr/bin/env python3
 """
-GymForge Browser Test Suite
-============================
-Logs in as every role, visits their key pages, and captures ALL errors:
-  - HTTP 4xx/5xx responses
-  - JavaScript console errors & exceptions
-  - Page crashes / timeouts
-  - Missing expected elements (smoke-tests)
+Liberty-Emporium Browser Test Suite
+=====================================
+Tests any app using a real Playwright Chromium browser.
+Captures HTTP errors, JS exceptions, console errors, missing content.
 
 Usage:
-    python3 scripts/browser_test.py                      # test all roles
-    python3 scripts/browser_test.py --role owner         # one role
-    python3 scripts/browser_test.py --role member trainer
-    python3 scripts/browser_test.py --headed             # see the browser
-    python3 scripts/browser_test.py --url https://your-railway-url.up.railway.app
-
-Output: color-coded terminal report + scripts/test_results.json
+  python3 browser_test.py --app gymforge
+  python3 browser_test.py --app gymforge --roles owner member
+  python3 browser_test.py --app all
+  python3 browser_test.py --url https://myapp.up.railway.app --email admin@x.com --password s3cr3t --pages "/" "/dashboard/"
+  python3 browser_test.py --app floodclaim --headed
+  python3 browser_test.py --app gymforge --timeout 30
 """
 
-import argparse, json, sys, time
+import argparse
+import json
+import sys
+import time
 from datetime import datetime
-from playwright.sync_api import sync_playwright, Page, BrowserContext
-
-# ── Config ────────────────────────────────────────────────────────────────────
-BASE_URL = "https://web-production-1c23.up.railway.app"
-
-ROLES = {
-    "owner": {
-        "email": "jay@gymforge.com",
-        "password": "GymForge2026!",
-        "pages": [
-            ("/owner/",              "dashboard",        ["Dashboard", "Gym"]),
-            ("/owner/tiers/",        "membership tiers", ["Tier", "Plan", "Member"]),
-            ("/owner/staff/",        "staff list",       ["Staff"]),
-            ("/owner/leads/",        "leads",            ["Lead"]),
-            ("/owner/branding/",     "branding preview", ["Brand", "Gym"]),
-        ],
-    },
-    "manager": {
-        "email": "manager@demo.gymforge.com",
-        "password": "Demo2026!",
-        "pages": [
-            ("/manager/",          "dashboard",  ["Dashboard", "Manager"]),
-            ("/manager/schedule/", "schedule",   ["Schedule", "Class"]),
-            ("/manager/shifts/",   "shifts",     ["Shift", "Staff"]),
-            ("/manager/checkins/", "check-ins",  ["Check"]),
-        ],
-    },
-    "trainer": {
-        "email": "trainer@demo.gymforge.com",
-        "password": "Demo2026!",
-        "pages": [
-            ("/trainer/",              "client list",   ["Client", "Member"]),
-            ("/trainer/appointments/", "appointments",  ["Appointment", "Schedule"]),
-            ("/trainer/workout-plans/", "workout plans", ["Plan", "Workout"]),
-        ],
-    },
-    "front_desk": {
-        "email": "front_desk@demo.gymforge.com",
-        "password": "Demo2026!",
-        "pages": [
-            ("/desk/",               "dashboard",     ["Dashboard", "Check"]),
-            ("/desk/checkin/manual/","manual check-in",["Check", "Member"]),
-            ("/desk/members/",       "member lookup", ["Member"]),
-        ],
-    },
-    "cleaner": {
-        "email": "cleaner@demo.gymforge.com",
-        "password": "Demo2026!",
-        "pages": [
-            ("/cleaner/",          "dashboard",  ["Dashboard", "Task", "Cleaner"]),
-            ("/cleaner/tasks/",    "task list",  ["Task"]),
-            ("/cleaner/summary/",  "shift summary", ["Shift", "Summary"]),
-        ],
-    },
-    "nutritionist": {
-        "email": "nutritionist@demo.gymforge.com",
-        "password": "Demo2026!",
-        "pages": [
-            ("/nutritionist/",              "client list",  ["Client", "Member"]),
-            ("/nutritionist/appointments/", "appointments", ["Appointment"]),
-            ("/nutritionist/plans/",        "nutrition plans", ["Plan", "Nutrition"]),
-        ],
-    },
-    "member": {
-        "email": "member@demo.gymforge.com",
-        "password": "Demo2026!",
-        "pages": [
-            ("/app/",              "member home",     ["Welcome", "Dashboard", "Gym"]),
-            ("/app/classes/",      "class schedule",  ["Class", "Schedule", "Book"]),
-            ("/app/workouts/",     "workout history", ["Workout"]),
-            ("/app/classes/my-bookings/", "my bookings", ["Booking", "Class"]),
-        ],
-    },
-}
+from pathlib import Path
 
 # ── ANSI colors ───────────────────────────────────────────────────────────────
 RED    = "\033[91m"
@@ -101,175 +27,270 @@ GREEN  = "\033[92m"
 YELLOW = "\033[93m"
 BLUE   = "\033[94m"
 BOLD   = "\033[1m"
+DIM    = "\033[2m"
 RESET  = "\033[0m"
 
 def ok(msg):    print(f"  {GREEN}✅ {msg}{RESET}")
 def warn(msg):  print(f"  {YELLOW}⚠️  {msg}{RESET}")
 def err(msg):   print(f"  {RED}❌ {msg}{RESET}")
 def info(msg):  print(f"  {BLUE}ℹ️  {msg}{RESET}")
+def dim(msg):   print(f"  {DIM}{msg}{RESET}")
 
-# ── Core test runner ──────────────────────────────────────────────────────────
-def test_role(page: Page, role: str, config: dict, base_url: str) -> dict:
-    results = {"role": role, "login": None, "pages": [], "errors": []}
-    email    = config["email"]
-    password = config["password"]
+# Noise to suppress from console output
+CONSOLE_SUPPRESS = [
+    "cdn.tailwindcss.com should not be used in production",
+    "favicon.ico",
+    "404 (Not Found)",
+]
 
-    # ── Login ──────────────────────────────────────────────────────────────
-    http_errors = []
-    console_errors = []
 
-    page.on("response", lambda r: http_errors.append(
-        f"HTTP {r.status} {r.url.replace(base_url, '')}"
-    ) if r.status >= 400 else None)
+def is_noise(msg: str) -> bool:
+    return any(s.lower() in msg.lower() for s in CONSOLE_SUPPRESS)
 
-    page.on("console", lambda m: console_errors.append(
-        f"[{m.type.upper()}] {m.text}"
-    ) if m.type in ("error", "warning") else None)
 
-    page.on("pageerror", lambda e: console_errors.append(f"[JS EXCEPTION] {e}"))
+# ── Core page tester ──────────────────────────────────────────────────────────
+def test_page(page, base_url: str, path: str, label: str,
+              keywords: list[str], timeout_ms: int) -> dict:
+    result = {
+        "path": path, "label": label,
+        "status": None, "http_errors": [], "console_errors": [],
+        "js_exceptions": [], "missing_keywords": [],
+    }
+
+    page_http    = []
+    page_console = []
+    page_js      = []
+
+    def on_response(r):
+        if r.status >= 400:
+            page_http.append(f"HTTP {r.status} → {r.url.replace(base_url, '')}")
+
+    def on_console(m):
+        if m.type in ("error", "warning") and not is_noise(m.text):
+            page_console.append(f"[{m.type.upper()}] {m.text[:200]}")
+
+    def on_pageerror(e):
+        page_js.append(f"[JS] {str(e)[:200]}")
+
+    page.on("response",  on_response)
+    page.on("console",   on_console)
+    page.on("pageerror", on_pageerror)
 
     try:
-        page.goto(f"{base_url}/auth/login/", timeout=15000)
-        page.fill("input[name='username'], input[name='email'], input[type='email']", email)
-        page.fill("input[name='password'], input[type='password']", password)
-        page.click("button[type='submit'], input[type='submit']")
-        page.wait_for_load_state("networkidle", timeout=15000)
+        resp = page.goto(f"{base_url}{path}", timeout=timeout_ms)
+        page.wait_for_load_state("domcontentloaded", timeout=timeout_ms)
 
-        current = page.url
-        if "/auth/login/" in current:
-            results["login"] = "FAILED — still on login page"
-            results["errors"].append(f"Login failed for {email}")
-            err(f"Login FAILED for {role} ({email})")
-            return results
+        status = resp.status if resp else "?"
+        final_url = page.url
+        title = page.title()
+        body = page.inner_text("body") if page.query_selector("body") else ""
 
-        results["login"] = "OK"
-        ok(f"Login OK  ({email}  →  {current.replace(base_url,'')})")
+        # Check for server errors
+        if status >= 500 or "Server Error" in title or "500" in title:
+            result["status"] = f"HTTP {status} — Server Error"
+            result["http_errors"].append(f"Server error {status} on {path}")
+            err(f"{label} ({path}) → SERVER ERROR {status}")
+
+        elif status == 404 or "Page not found" in title or "404" in title:
+            result["status"] = f"HTTP 404 — Not Found"
+            result["http_errors"].append(f"404 on {path}")
+            warn(f"{label} ({path}) → 404 Not Found")
+
+        elif "/auth/login" in final_url or "/login" in final_url:
+            result["status"] = "REDIRECT → login (access denied)"
+            warn(f"{label} ({path}) → redirected to login")
+
+        else:
+            result["status"] = f"HTTP {status} OK"
+
+            # Keyword smoke test
+            missing = [kw for kw in keywords
+                       if kw.lower() not in body.lower() and kw.lower() not in title.lower()]
+            if missing:
+                result["missing_keywords"] = missing
+                warn(f"{label} ({path}) → loaded but missing: {missing}")
+            else:
+                ok(f"{label} ({path}) → {status} ✓")
 
     except Exception as e:
-        results["login"] = f"ERROR: {e}"
-        results["errors"].append(str(e))
-        err(f"Login exception for {role}: {e}")
-        return results
+        result["status"] = f"EXCEPTION: {str(e)[:120]}"
+        err(f"{label} ({path}) → {str(e)[:80]}")
 
-    # ── Page tests ─────────────────────────────────────────────────────────
-    for path, label, expected_keywords in config["pages"]:
-        page_errors   = []
-        page_console  = []
-        page_http     = []
+    finally:
+        page.remove_listener("response",  on_response)
+        page.remove_listener("console",   on_console)
+        page.remove_listener("pageerror", on_pageerror)
 
-        # Per-page listeners
-        def on_response(r, _ph=page_http):
-            if r.status >= 400:
-                _ph.append(f"HTTP {r.status} → {r.url.replace(base_url,'')}")
+    result["http_errors"]    += page_http
+    result["console_errors"]  = page_console
+    result["js_exceptions"]   = page_js
 
-        def on_console(m, _pc=page_console):
-            if m.type in ("error", "warning"):
-                _pc.append(f"[{m.type.upper()}] {m.text}")
+    for e in page_http:    warn(f"  → Network: {e}")
+    for e in page_js:      err(f"  → JS Exception: {e}")
+    for c in page_console[:3]: dim(f"  → Console: {c}")
 
-        def on_pageerror(e, _pe=page_errors):
-            _pe.append(f"[JS EXCEPTION] {e}")
+    return result
 
-        page.on("response",  on_response)
-        page.on("console",   on_console)
-        page.on("pageerror", on_pageerror)
 
-        page_result = {
-            "path": path, "label": label,
-            "status": None, "http_errors": [], "console_errors": [],
-            "js_exceptions": [], "missing_elements": [],
-        }
+# ── Login helper ──────────────────────────────────────────────────────────────
+def do_login(page, base_url: str, login_path: str,
+             email: str, password: str, timeout_ms: int) -> bool:
+    try:
+        page.goto(f"{base_url}{login_path}", timeout=timeout_ms)
+        page.wait_for_load_state("domcontentloaded", timeout=timeout_ms)
 
-        try:
-            resp = page.goto(f"{base_url}{path}", timeout=15000)
-            page.wait_for_load_state("domcontentloaded", timeout=10000)
-            status_code = resp.status if resp else "?"
+        # Fill email/username
+        for sel in ["input[name='username']", "input[name='email']", "input[type='email']"]:
+            if page.query_selector(sel):
+                page.fill(sel, email)
+                break
 
-            # Check for server errors in page title / body
-            title = page.title()
-            body_text = page.inner_text("body") if page.query_selector("body") else ""
+        # Fill password
+        page.fill("input[type='password']", password)
 
-            if status_code >= 500 or "Server Error" in title or "500" in title:
-                page_result["status"] = f"HTTP {status_code} — Server Error"
-                page_result["http_errors"].append(f"{status_code} on {path}")
-                err(f"{label} ({path}) → {RED}SERVER ERROR {status_code}{RESET}")
+        # Submit
+        page.click("button[type='submit'], input[type='submit']")
+        page.wait_for_load_state("networkidle", timeout=timeout_ms)
 
-            elif status_code == 404 or "Page not found" in title:
-                page_result["status"] = f"HTTP 404 — Not Found"
-                page_result["http_errors"].append(f"404 on {path}")
-                warn(f"{label} ({path}) → 404 Not Found")
+        current = page.url
+        if login_path.rstrip("/") in current.replace(base_url, "").rstrip("/"):
+            return False  # Still on login page
+        return True
 
-            elif "/auth/login/" in page.url:
-                page_result["status"] = "REDIRECT → login (permission denied)"
-                warn(f"{label} ({path}) → redirected to login")
+    except Exception as e:
+        return False
 
+
+# ── Run one role ──────────────────────────────────────────────────────────────
+def test_role(browser, base_url: str, role_config: dict,
+              login_path: str, timeout_ms: int) -> dict:
+    from playwright.sync_api import BrowserContext
+
+    role    = role_config.get("role", "user")
+    email   = role_config.get("email", "")
+    password = role_config.get("password", "")
+    pages   = role_config.get("pages", [])
+
+    result = {"role": role, "login": None, "pages": [], "total_errors": 0}
+
+    context: BrowserContext = browser.new_context(
+        viewport={"width": 1280, "height": 900},
+        ignore_https_errors=True,
+    )
+    page = context.new_page()
+
+    try:
+        print(f"\n{BOLD}{BLUE}── {role.upper()} ({email}) ──{RESET}")
+
+        if email:
+            logged_in = do_login(page, base_url, login_path, email, password, timeout_ms)
+            result["login"] = "OK" if logged_in else "FAILED"
+            if logged_in:
+                ok(f"Login OK → {page.url.replace(base_url,'')}")
             else:
-                page_result["status"] = f"HTTP {status_code} OK"
+                err(f"Login FAILED for {email}")
+                return result
 
-                # Smoke test — check expected keywords appear somewhere on page
-                missing = []
-                for kw in expected_keywords:
-                    if kw.lower() not in body_text.lower() and kw.lower() not in title.lower():
-                        missing.append(kw)
-                if missing:
-                    page_result["missing_elements"] = missing
-                    warn(f"{label} ({path}) → loaded but missing: {missing}")
-                else:
-                    ok(f"{label} ({path}) → {status_code} ✓ content looks good")
+        for page_def in pages:
+            path, label = page_def[0], page_def[1]
+            keywords = page_def[2] if len(page_def) > 2 else []
+            pr = test_page(page, base_url, path, label, keywords, timeout_ms)
+            result["pages"].append(pr)
 
-        except Exception as e:
-            page_result["status"] = f"EXCEPTION: {e}"
-            err(f"{label} ({path}) → Exception: {e}")
+    finally:
+        context.close()
 
-        finally:
-            page.remove_listener("response",  on_response)
-            page.remove_listener("console",   on_console)
-            page.remove_listener("pageerror", on_pageerror)
+    return result
 
-        page_result["http_errors"]    += page_http
-        page_result["console_errors"] += page_console
-        page_result["js_exceptions"]  += page_errors
 
-        if page_http:
-            for e in page_http:
-                warn(f"  → Network: {e}")
-        if page_errors:
-            for e in page_errors:
-                err(f"  → JS: {e}")
-        if page_console:
-            filtered = [c for c in page_console if "favicon" not in c.lower()]
-            for c in filtered[:3]:
-                warn(f"  → Console: {c}")
-
-        results["pages"].append(page_result)
-
-    return results
+# ── Count hard errors ─────────────────────────────────────────────────────────
+def count_errors(result: dict) -> int:
+    n = 0
+    if result.get("login") == "FAILED":
+        n += 1
+    for pr in result.get("pages", []):
+        if pr.get("http_errors"):  n += len(pr["http_errors"])
+        if pr.get("js_exceptions"): n += len(pr["js_exceptions"])
+        if pr.get("status") and ("500" in str(pr["status"]) or "EXCEPTION" in str(pr["status"])):
+            n += 1
+    return n
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 def main():
-    parser = argparse.ArgumentParser(description="GymForge Browser Test Suite")
-    parser.add_argument("--role",   nargs="*", help="Roles to test (default: all)")
-    parser.add_argument("--headed", action="store_true", help="Show browser window")
-    parser.add_argument("--url",    default=BASE_URL, help="Override base URL")
-    parser.add_argument("--slow",   type=int, default=0, help="Slow-mo ms (use with --headed)")
+    parser = argparse.ArgumentParser(description="Liberty-Emporium Browser Test Suite")
+    parser.add_argument("--app",      help="App name from app_configs.py, or 'all'")
+    parser.add_argument("--roles",    nargs="*", help="Roles to test (default: all roles for app)")
+    parser.add_argument("--url",      help="Override/specify base URL directly")
+    parser.add_argument("--email",    help="Login email (with --url)")
+    parser.add_argument("--password", help="Login password (with --url)")
+    parser.add_argument("--pages",    nargs="*", help="Page paths to test (with --url)")
+    parser.add_argument("--headed",   action="store_true", help="Show browser window")
+    parser.add_argument("--slow",     type=int, default=0, help="Slow-mo ms")
+    parser.add_argument("--timeout",  type=int, default=20, help="Page timeout in seconds")
+    parser.add_argument("--out",      default="/tmp/browser_test_results.json", help="JSON output path")
     args = parser.parse_args()
 
-    base_url  = args.url.rstrip("/")
-    roles_to_test = args.role or list(ROLES.keys())
-    invalid = [r for r in roles_to_test if r not in ROLES]
-    if invalid:
-        print(f"Unknown roles: {invalid}. Available: {list(ROLES.keys())}")
-        sys.exit(1)
+    timeout_ms = args.timeout * 1000
 
+    # Load app configs
+    configs_path = Path(__file__).parent / "app_configs.py"
+    app_configs = {}
+    if configs_path.exists():
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("app_configs", configs_path)
+        mod  = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        app_configs = mod.APPS
+
+    # Build list of app configs to test
+    test_queue = []
+
+    if args.url:
+        # Ad-hoc URL mode
+        pages = [(p, p, []) for p in (args.pages or ["/"])]
+        cfg = {
+            "name": args.url,
+            "url":  args.url.rstrip("/"),
+            "login_path": "/auth/login/",
+            "public_pages": pages,
+            "roles": [],
+        }
+        if args.email:
+            cfg["roles"] = [{
+                "role": "user",
+                "email": args.email,
+                "password": args.password or "",
+                "pages": pages,
+            }]
+        test_queue.append(cfg)
+
+    elif args.app == "all":
+        test_queue = list(app_configs.values())
+
+    elif args.app:
+        if args.app not in app_configs:
+            print(f"Unknown app '{args.app}'. Available: {list(app_configs.keys())}")
+            sys.exit(1)
+        test_queue = [app_configs[args.app]]
+
+    else:
+        parser.print_help()
+        sys.exit(0)
+
+    # Print header
+    app_names = [c.get("name", c.get("url", "?")) for c in test_queue]
     print(f"\n{BOLD}{'='*60}{RESET}")
-    print(f"{BOLD}  GymForge Browser Test Suite{RESET}")
-    print(f"  URL:   {base_url}")
-    print(f"  Roles: {', '.join(roles_to_test)}")
-    print(f"  Time:  {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    print(f"{BOLD}{'='*60}{RESET}\n")
+    print(f"{BOLD}  Liberty-Emporium Browser Test Suite{RESET}")
+    print(f"  Apps:    {', '.join(app_names)}")
+    print(f"  Time:    {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"  Timeout: {args.timeout}s per page")
+    print(f"{BOLD}{'='*60}{RESET}")
 
     all_results = []
-    total_errors = 0
+    grand_total_errors = 0
+
+    from playwright.sync_api import sync_playwright
 
     with sync_playwright() as p:
         browser = p.chromium.launch(
@@ -278,71 +299,101 @@ def main():
             args=["--no-sandbox", "--disable-dev-shm-usage"],
         )
 
-        for role in roles_to_test:
-            config = ROLES[role]
-            print(f"\n{BOLD}{BLUE}── {role.upper()} ──{RESET}")
+        for cfg in test_queue:
+            app_name   = cfg.get("name", cfg.get("url", "?"))
+            base_url   = cfg.get("url", "").rstrip("/")
+            login_path = cfg.get("login_path", "/auth/login/")
 
-            context: BrowserContext = browser.new_context(
-                viewport={"width": 1280, "height": 900},
-                ignore_https_errors=True,
-            )
-            page = context.new_page()
+            print(f"\n{BOLD}{'─'*60}{RESET}")
+            print(f"{BOLD}  {app_name}  ({base_url}){RESET}")
+            print(f"{BOLD}{'─'*60}{RESET}")
 
-            try:
-                result = test_role(page, role, config, base_url)
-                all_results.append(result)
+            app_result = {"app": app_name, "url": base_url, "roles": [], "public": [], "errors": 0}
 
-                # Count errors for this role
-                role_errors = len(result["errors"])
-                for pr in result["pages"]:
-                    role_errors += len(pr["http_errors"])
-                    role_errors += len(pr["js_exceptions"])
-                    if pr["status"] and ("500" in str(pr["status"]) or "Error" in str(pr["status"])):
-                        role_errors += 1
-                total_errors += role_errors
+            # Public pages (no login)
+            pub_pages = cfg.get("public_pages", [])
+            if pub_pages:
+                print(f"\n{BOLD}{BLUE}── PUBLIC PAGES ──{RESET}")
+                ctx = browser.new_context(viewport={"width": 1280, "height": 900}, ignore_https_errors=True)
+                pg  = ctx.new_page()
+                try:
+                    for page_def in pub_pages:
+                        path, label = page_def[0], page_def[1]
+                        keywords = page_def[2] if len(page_def) > 2 else []
+                        pr = test_page(pg, base_url, path, label, keywords, timeout_ms)
+                        app_result["public"].append(pr)
+                finally:
+                    ctx.close()
 
-            finally:
-                context.close()
+            # Authenticated roles
+            roles = cfg.get("roles", [])
+            if args.roles:
+                roles = [r for r in roles if r.get("role") in args.roles]
+
+            for role_cfg in roles:
+                r = test_role(browser, base_url, role_cfg, login_path, timeout_ms)
+                app_result["roles"].append(r)
+
+            # Count errors for this app
+            for pr in app_result["public"]:
+                if pr.get("http_errors"):  app_result["errors"] += len(pr["http_errors"])
+                if pr.get("js_exceptions"): app_result["errors"] += len(pr["js_exceptions"])
+            for role_r in app_result["roles"]:
+                app_result["errors"] += count_errors(role_r)
+
+            grand_total_errors += app_result["errors"]
+            all_results.append(app_result)
 
         browser.close()
 
-    # ── Summary ───────────────────────────────────────────────────────────
+    # ── Summary ───────────────────────────────────────────────────────────────
     print(f"\n{BOLD}{'='*60}{RESET}")
     print(f"{BOLD}  SUMMARY{RESET}")
     print(f"{BOLD}{'='*60}{RESET}")
 
-    for r in all_results:
-        role_errs = []
-        for pr in r["pages"]:
-            if pr["http_errors"]:    role_errs += pr["http_errors"]
-            if pr["js_exceptions"]:  role_errs += pr["js_exceptions"]
-            if pr["status"] and ("500" in str(pr["status"]) or "Exception" in str(pr["status"])):
-                role_errs.append(pr["status"])
+    for app_r in all_results:
+        app_errors = app_r["errors"]
+        status_icon = f"{GREEN}✅{RESET}" if app_errors == 0 else f"{RED}❌{RESET}"
+        print(f"\n  {status_icon} {BOLD}{app_r['app']}{RESET}")
 
-        login_ok = r["login"] == "OK"
-        if not role_errs and login_ok:
-            print(f"  {GREEN}✅ {r['role'].upper():15}{RESET} — {len(r['pages'])} pages, no errors")
-        else:
-            print(f"  {RED}❌ {r['role'].upper():15}{RESET} — login={'OK' if login_ok else 'FAILED'}, {len(role_errs)} error(s)")
-            for e in role_errs[:5]:
-                print(f"      {RED}→ {e}{RESET}")
+        # Public pages summary
+        for pr in app_r["public"]:
+            e = len(pr.get("http_errors", [])) + len(pr.get("js_exceptions", []))
+            if e == 0 and "500" not in str(pr.get("status", "")):
+                print(f"    {GREEN}✅{RESET} {pr['label']} ({pr['path']})")
+            else:
+                print(f"    {RED}❌{RESET} {pr['label']} ({pr['path']}) → {pr['status']}")
 
-    print(f"\n  Total hard errors: {BOLD}{RED if total_errors else GREEN}{total_errors}{RESET}")
-    print(f"  Tested roles:      {', '.join(roles_to_test)}")
+        # Role summaries
+        for role_r in app_r["roles"]:
+            role_errors = count_errors(role_r)
+            login_ok = role_r.get("login") == "OK"
+            pages_ok = len([p for p in role_r.get("pages", []) if not p.get("http_errors") and "500" not in str(p.get("status",""))])
+            pages_total = len(role_r.get("pages", []))
+
+            if role_errors == 0 and login_ok:
+                print(f"    {GREEN}✅{RESET} {role_r['role'].upper():<15} — {pages_ok}/{pages_total} pages OK")
+            else:
+                print(f"    {RED}❌{RESET} {role_r['role'].upper():<15} — login={'OK' if login_ok else 'FAILED'}, {role_errors} error(s)")
+                for pr in role_r.get("pages", []):
+                    for e in pr.get("http_errors", [])[:2]:
+                        print(f"        {RED}→ {e}{RESET}")
+                    for e in pr.get("js_exceptions", [])[:1]:
+                        print(f"        {RED}→ {e}{RESET}")
+
+    print(f"\n  Total hard errors: {BOLD}{RED if grand_total_errors else GREEN}{grand_total_errors}{RESET}")
     print(f"  Finished at:       {datetime.now().strftime('%H:%M:%S')}\n")
 
-    # ── Save JSON results ──────────────────────────────────────────────────
-    out_path = "/root/.openclaw/workspace/GymForge/scripts/test_results.json"
-    with open(out_path, "w") as f:
+    # Save JSON
+    with open(args.out, "w") as f:
         json.dump({
             "timestamp": datetime.now().isoformat(),
-            "base_url": base_url,
             "results": all_results,
-            "total_errors": total_errors,
+            "total_errors": grand_total_errors,
         }, f, indent=2)
-    info(f"Full results saved → {out_path}")
+    info(f"Results → {args.out}")
 
-    sys.exit(1 if total_errors > 0 else 0)
+    sys.exit(1 if grand_total_errors > 0 else 0)
 
 
 if __name__ == "__main__":
