@@ -315,6 +315,34 @@ def guest_checkin(request):
 
 
 # ---------------------------------------------------------------------------
+# Door Scanner — fullscreen tablet UI for a physical door reader
+# ---------------------------------------------------------------------------
+
+def door_scanner(request):
+    """
+    Fullscreen door scanner page for a tablet mounted at the gym entrance.
+
+    Works with:
+    - USB HID card readers (type card number + Enter)
+    - QR code scanners (same HID keyboard mode)
+    - Manual entry fallback (on-screen button)
+
+    The page POSTs to /api/v1/door/validate/ with the card number
+    and displays a full-screen green (granted) or red (denied) result
+    for 4 seconds before returning to idle.
+
+    Setup: visit /kiosk/setup/ first to set the device token in session.
+    """
+    device = _get_device(request)
+    if not device:
+        return redirect('kiosk:setup')
+
+    ctx = _gym_context(device)
+    ctx['device'] = device
+    return render(request, 'kiosk/door_scanner.html', ctx)
+
+
+# ---------------------------------------------------------------------------
 # Set PIN (for members via front desk — not a kiosk-facing page)
 # ---------------------------------------------------------------------------
 

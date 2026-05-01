@@ -146,8 +146,9 @@ def validate(request):
         return JsonResponse({'error': 'Invalid JSON body'}, status=400)
 
     device_token = body.get('device_token', '').strip()
-    rfid_token = body.get('rfid_token', '').strip()
-    scan_type = body.get('scan_type', 'entry').strip()
+    rfid_token   = body.get('rfid_token', '').strip()
+    card_number  = body.get('card_number', '').strip().upper()  # from USB reader / QR
+    scan_type    = body.get('scan_type', 'entry').strip()
 
     # ── 1. Authenticate device ────────────────────────────────────────────
     if not device_token:
@@ -177,16 +178,27 @@ def validate(request):
             status=200,
         )
 
-    try:
-        card = (
-            MemberCard.objects
-            .select_related(
-                'member__user',
-                'member',
+    # Lookup by rfid_token (RFID hardware) OR card_number (USB/QR reader)
+    card = None
+    if rfid_token:
+        try:
+            card = (
+                MemberCard.objects
+                .select_related('member__user', 'member')
+                .get(rfid_token=rfid_token)
             )
-            .get(rfid_token=rfid_token)
-        )
-    except MemberCard.DoesNotExist:
+        except MemberCard.DoesNotExist:
+            pass
+    if card is None and card_number:
+        try:
+            card = (
+                MemberCard.objects
+                .select_related('member__user', 'member')
+                .get(card_number=card_number)
+            )
+        except MemberCard.DoesNotExist:
+            pass
+    if card is None:
         # Cannot log — no card record exists
         return JsonResponse(
             {

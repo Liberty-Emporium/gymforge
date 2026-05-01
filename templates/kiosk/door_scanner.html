@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>{{ gym_name|default:"GymForge" }} — Door Scanner</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root {
+      --primary: {{ primary_color|default:"#0f0f1a" }};
+      --accent:  {{ accent_color|default:"#e94560" }};
+    }
+    * { -webkit-tap-highlight-color: transparent; }
+    body {
+      background: var(--primary);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      overflow: hidden; height: 100vh; width: 100vw;
+      display: flex; flex-direction: column;
+      user-select: none; -webkit-user-select: none;
+    }
+
+    /* ── IDLE STATE ─────────────────────────────────────────────────── */
+    #screen-idle {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 2.5rem;
+      transition: opacity .35s ease;
+    }
+    .card-icon {
+      width: 140px; height: 140px; border-radius: 28px;
+      background: rgba(255,255,255,.06);
+      border: 2px solid rgba(255,255,255,.12);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 4.5rem;
+    }
+    .pulse-ring {
+      position: absolute; inset: -16px; border-radius: 44px;
+      border: 2px solid var(--accent);
+      animation: pulse-ring 2.2s ease-out infinite;
+      opacity: 0;
+    }
+    @keyframes pulse-ring {
+      0%   { transform: scale(.88); opacity: .7; }
+      60%  { opacity: .3; }
+      100% { transform: scale(1.12); opacity: 0; }
+    }
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50%       { transform: translateY(-10px); }
+    }
+    .float-icon { animation: float 3.5s ease-in-out infinite; }
+
+    .scan-prompt {
+      font-size: 2.2rem; font-weight: 800; color: #fff;
+      letter-spacing: -.02em; text-align: center;
+    }
+    .scan-sub {
+      font-size: 1rem; color: rgba(255,255,255,.45);
+      text-align: center; margin-top: .4rem;
+    }
+
+    /* ── RESULT STATE ───────────────────────────────────────────────── */
+    #screen-result {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 2rem;
+      opacity: 0; pointer-events: none;
+      transition: opacity .3s ease;
+    }
+    #screen-result.show { opacity: 1; pointer-events: auto; }
+
+    .result-icon {
+      font-size: 7rem; line-height: 1;
+      animation: result-pop .4s cubic-bezier(.175,.885,.32,1.275) both;
+    }
+    @keyframes result-pop {
+      from { transform: scale(.3); opacity: 0; }
+      to   { transform: scale(1);  opacity: 1; }
+    }
+    .result-name {
+      font-size: 2.8rem; font-weight: 900; color: #fff;
+      letter-spacing: -.03em; text-align: center;
+      animation: slide-up .35s ease both .1s;
+    }
+    .result-msg {
+      font-size: 1.15rem; font-weight: 500; text-align: center;
+      animation: slide-up .35s ease both .2s;
+    }
+    .result-tier {
+      font-size: .9rem; color: rgba(255,255,255,.5);
+      text-align: center;
+      animation: slide-up .35s ease both .25s;
+    }
+    @keyframes slide-up {
+      from { transform: translateY(20px); opacity: 0; }
+      to   { transform: translateY(0);    opacity: 1; }
+    }
+
+    /* ── GRANTED / DENIED backgrounds ──────────────────────────────── */
+    body.granted { background: #0b2e1a; }
+    body.denied  { background: #2e0b0b; }
+
+    .granted-color { color: #34d399; }
+    .denied-color  { color: #f87171; }
+
+    /* ── PROGRESS BAR (auto-dismiss) ───────────────────────────────── */
+    #progress-bar {
+      position: absolute; bottom: 0; left: 0; height: 5px;
+      background: var(--accent); width: 0%;
+      transition: width linear;
+    }
+
+    /* ── RECENT SCANS LOG (bottom strip) ─────────────────────────────*/
+    #scan-log {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      background: rgba(0,0,0,.55); backdrop-filter: blur(10px);
+      border-top: 1px solid rgba(255,255,255,.07);
+      padding: 10px 24px;
+      display: flex; align-items: center; gap: 16px;
+      overflow: hidden;
+      height: 52px;
+      z-index: 10;
+    }
+    .log-label {
+      font-size: .72rem; color: rgba(255,255,255,.3);
+      white-space: nowrap; flex-shrink: 0;
+      text-transform: uppercase; letter-spacing: .08em;
+    }
+    .log-entries {
+      display: flex; gap: 12px; overflow: hidden; flex: 1;
+    }
+    .log-entry {
+      display: flex; align-items: center; gap: 6px;
+      font-size: .78rem; white-space: nowrap;
+      padding: 3px 10px; border-radius: 20px;
+      animation: log-slide .3s ease both;
+    }
+    .log-entry.granted { background: rgba(52,211,153,.12); color: #34d399; }
+    .log-entry.denied  { background: rgba(248,113,113,.12); color: #f87171; }
+    @keyframes log-slide {
+      from { opacity: 0; transform: translateX(20px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+
+    /* ── TOP BAR ────────────────────────────────────────────────────── */
+    #topbar {
+      position: fixed; top: 0; left: 0; right: 0;
+      padding: 14px 24px;
+      display: flex; align-items: center; justify-content: space-between;
+      z-index: 10;
+      background: linear-gradient(to bottom, rgba(0,0,0,.5), transparent);
+    }
+    .gym-brand {
+      display: flex; align-items: center; gap: 10px;
+    }
+    .gym-logo {
+      height: 32px; width: 32px; border-radius: 8px;
+      background: var(--accent);
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 900; color: #fff; font-size: .95rem;
+    }
+    .gym-name-text { font-size: .9rem; font-weight: 700; color: rgba(255,255,255,.7); }
+    #clock { font-size: .85rem; color: rgba(255,255,255,.4); font-variant-numeric: tabular-nums; }
+
+    /* ── HIDDEN INPUT ───────────────────────────────────────────────── */
+    #card-input {
+      position: absolute; opacity: 0; width: 1px; height: 1px;
+      top: 50%; left: 50%;
+    }
+
+    /* ── MANUAL ENTRY OVERLAY ───────────────────────────────────────── */
+    #manual-panel {
+      position: fixed; inset: 0; background: rgba(0,0,0,.85);
+      z-index: 200; display: none;
+      flex-direction: column; align-items: center; justify-content: center; gap: 1.5rem;
+    }
+    #manual-panel.open { display: flex; }
+    .manual-input {
+      background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.2);
+      border-radius: 12px; padding: 14px 20px; color: #fff;
+      font-size: 1.4rem; text-align: center; letter-spacing: .2em;
+      width: 280px; outline: none;
+      font-family: 'Courier New', monospace;
+    }
+    .manual-input:focus { border-color: var(--accent); }
+    .manual-title { font-size: 1.2rem; font-weight: 700; color: #fff; }
+    .manual-sub   { font-size: .85rem; color: rgba(255,255,255,.4); }
+  </style>
+</head>
+<body>
+
+<!-- Top bar -->
+<div id="topbar">
+  <div class="gym-brand">
+    {% if gym_logo_url %}
+    <img src="{{ gym_logo_url }}" alt="{{ gym_name }}" class="h-8 rounded-lg object-contain">
+    {% else %}
+    <div class="gym-logo">{{ gym_name|first|upper|default:"G" }}</div>
+    {% endif %}
+    <span class="gym-name-text">{{ gym_name|default:"GymForge" }}</span>
+  </div>
+  <div id="clock"></div>
+</div>
+
+<!-- IDLE SCREEN -->
+<div id="screen-idle">
+  <div style="position:relative" class="float-icon">
+    <div class="pulse-ring"></div>
+    <div class="card-icon">🪪</div>
+  </div>
+  <div>
+    <div class="scan-prompt">Tap or Scan Your Card</div>
+    <div class="scan-sub">Hold your card near the reader to enter</div>
+  </div>
+  <button onclick="openManual()"
+    style="margin-top:1rem;padding:10px 24px;border-radius:30px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.05);color:rgba(255,255,255,.5);font-size:.85rem;cursor:pointer;">
+    Enter Card Number Manually
+  </button>
+</div>
+
+<!-- RESULT SCREEN -->
+<div id="screen-result">
+  <div class="result-icon" id="result-icon">✅</div>
+  <div class="result-name" id="result-name">Welcome!</div>
+  <div class="result-msg" id="result-msg"></div>
+  <div class="result-tier" id="result-tier"></div>
+  <div id="progress-bar"></div>
+</div>
+
+<!-- BOTTOM LOG STRIP -->
+<div id="scan-log">
+  <span class="log-label">Recent</span>
+  <div class="log-entries" id="log-entries">
+    <span style="font-size:.75rem;color:rgba(255,255,255,.2)">No scans yet</span>
+  </div>
+</div>
+
+<!-- MANUAL ENTRY PANEL -->
+<div id="manual-panel">
+  <div class="manual-title">Enter Card Number</div>
+  <div class="manual-sub">Type your card number (e.g. GF-00042)</div>
+  <input id="manual-input" class="manual-input" type="text"
+    placeholder="GF-00000"
+    autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false">
+  <div style="display:flex;gap:12px">
+    <button onclick="submitManual()"
+      style="padding:12px 28px;border-radius:10px;border:none;background:var(--accent);color:#fff;font-weight:700;font-size:1rem;cursor:pointer;">
+      Check In
+    </button>
+    <button onclick="closeManual()"
+      style="padding:12px 28px;border-radius:10px;border:1px solid rgba(255,255,255,.2);background:transparent;color:rgba(255,255,255,.6);font-size:1rem;cursor:pointer;">
+      Cancel
+    </button>
+  </div>
+</div>
+
+<!-- Hidden auto-capture input (USB readers type into here) -->
+<input id="card-input" type="text" autocomplete="off"
+  aria-hidden="true" tabindex="-1">
+
+<script>
+const DEVICE_TOKEN = '{{ device.device_token }}';
+const API_URL      = '/api/v1/door/validate/';
+
+// ── Clock ──────────────────────────────────────────────────────────────────
+(function clock(){
+  const el = document.getElementById('clock');
+  function tick(){
+    const n = new Date();
+    el.textContent = n.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  }
+  tick(); setInterval(tick, 1000);
+})();
+
+// ── State ──────────────────────────────────────────────────────────────────
+let _dismissTimer   = null;
+let _progressTimer  = null;
+let _processingCard = false;
+const DISMISS_MS    = 4000; // show result for 4 seconds
+
+// ── Log strip ──────────────────────────────────────────────────────────────
+const _log = [];
+function pushLog(name, granted) {
+  _log.unshift({ name, granted, ts: new Date() });
+  if (_log.length > 8) _log.pop();
+  const container = document.getElementById('log-entries');
+  container.innerHTML = '';
+  _log.forEach(function(entry) {
+    const el = document.createElement('span');
+    el.className = 'log-entry ' + (entry.granted ? 'granted' : 'denied');
+    el.textContent = (entry.granted ? '✓' : '✗') + ' ' + entry.name;
+    container.appendChild(el);
+  });
+}
+
+// ── Show result ────────────────────────────────────────────────────────────
+function showResult(ok, name, message, tier) {
+  const body    = document.body;
+  const idle    = document.getElementById('screen-idle');
+  const result  = document.getElementById('screen-result');
+  const icon    = document.getElementById('result-icon');
+  const nameEl  = document.getElementById('result-name');
+  const msgEl   = document.getElementById('result-msg');
+  const tierEl  = document.getElementById('result-tier');
+  const bar     = document.getElementById('progress-bar');
+
+  body.className = ok ? 'granted' : 'denied';
+  icon.textContent  = ok ? '✅' : '🚫';
+  icon.className    = 'result-icon';
+  nameEl.textContent = name;
+  msgEl.textContent  = message;
+  msgEl.className    = 'result-msg ' + (ok ? 'granted-color' : 'denied-color');
+  tierEl.textContent = tier || '';
+
+  // Force re-trigger animation
+  void icon.offsetWidth;
+  icon.className = 'result-icon';
+
+  idle.style.opacity   = '0';
+  idle.style.pointerEvents = 'none';
+  result.classList.add('show');
+
+  // Progress bar
+  bar.style.transition = 'none';
+  bar.style.width      = '0%';
+  void bar.offsetWidth;
+  bar.style.background = ok ? '#34d399' : '#f87171';
+  bar.style.transition = `width ${DISMISS_MS}ms linear`;
+  bar.style.width      = '100%';
+
+  // Push to log
+  pushLog(name, ok);
+
+  // Auto-dismiss
+  if (_dismissTimer)  clearTimeout(_dismissTimer);
+  _dismissTimer = setTimeout(showIdle, DISMISS_MS);
+}
+
+function showIdle() {
+  document.body.className = '';
+  const idle   = document.getElementById('screen-idle');
+  const result = document.getElementById('screen-result');
+  idle.style.opacity      = '1';
+  idle.style.pointerEvents = 'auto';
+  result.classList.remove('show');
+  _processingCard = false;
+  refocusInput();
+}
+
+// ── Validate card ──────────────────────────────────────────────────────────
+function validateCard(cardNumber) {
+  if (_processingCard) return;
+  _processingCard = true;
+
+  // Immediately show a "checking..." state
+  const idle   = document.getElementById('screen-idle');
+  const result = document.getElementById('screen-result');
+  idle.style.opacity = '0.3';
+
+  // POST to API
+  fetch(API_URL, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      device_token: DEVICE_TOKEN,
+      card_number:  cardNumber.trim().toUpperCase(),
+      scan_type:    'entry',
+    }),
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(data) {
+    idle.style.opacity = '1';
+    const granted = data.result === 'granted';
+    const name    = data.member_name || cardNumber;
+    const msg     = granted
+      ? 'Access Granted — Welcome!'
+      : (data.denial_reason || 'Access Denied');
+    const tier    = granted ? (data.card_number || '') : '';
+    showResult(granted, name, msg, tier);
+  })
+  .catch(function() {
+    idle.style.opacity = '1';
+    _processingCard = false;
+    showResult(false, 'Error', 'Connection error. Please try again.', '');
+  });
+}
+
+// ── USB card reader input capture ─────────────────────────────────────────
+// USB HID readers act as a keyboard — they type the card number + Enter
+// We keep a hidden input focused at all times to capture it.
+const hiddenInput = document.getElementById('card-input');
+let _inputBuffer  = '';
+let _inputTimer   = null;
+
+function refocusInput() {
+  // Don't steal focus from manual panel
+  if (document.getElementById('manual-panel').classList.contains('open')) return;
+  hiddenInput.focus();
+}
+
+hiddenInput.addEventListener('input', function() {
+  clearTimeout(_inputTimer);
+  _inputBuffer += hiddenInput.value;
+  hiddenInput.value = '';
+  // USB readers finish with Enter (keydown), but also auto-submit after 80ms silence
+  _inputTimer = setTimeout(function() {
+    if (_inputBuffer.trim()) {
+      validateCard(_inputBuffer.trim());
+      _inputBuffer = '';
+    }
+  }, 80);
+});
+
+hiddenInput.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') {
+    clearTimeout(_inputTimer);
+    const val = (_inputBuffer + hiddenInput.value).trim();
+    hiddenInput.value = '';
+    _inputBuffer = '';
+    if (val) validateCard(val);
+  }
+});
+
+// Also capture keyboard typing anywhere on page (fallback)
+document.addEventListener('keydown', function(e) {
+  if (document.getElementById('manual-panel').classList.contains('open')) return;
+  if (document.activeElement !== hiddenInput) hiddenInput.focus();
+});
+
+// Keep focus on hidden input whenever user touches the idle screen
+document.getElementById('screen-idle').addEventListener('click', refocusInput);
+
+// Auto-focus on load
+window.addEventListener('load', function() { setTimeout(refocusInput, 200); });
+
+// ── Manual entry ──────────────────────────────────────────────────────────
+function openManual() {
+  document.getElementById('manual-panel').classList.add('open');
+  setTimeout(function(){ document.getElementById('manual-input').focus(); }, 100);
+}
+
+function closeManual() {
+  document.getElementById('manual-panel').classList.remove('open');
+  document.getElementById('manual-input').value = '';
+  refocusInput();
+}
+
+function submitManual() {
+  const val = document.getElementById('manual-input').value.trim();
+  if (!val) return;
+  closeManual();
+  validateCard(val);
+}
+
+document.getElementById('manual-input').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') submitManual();
+  if (e.key === 'Escape') closeManual();
+});
+
+// Tap anywhere on result to dismiss early
+document.getElementById('screen-result').addEventListener('click', function() {
+  if (_dismissTimer) clearTimeout(_dismissTimer);
+  showIdle();
+});
+</script>
+</body>
+</html>
